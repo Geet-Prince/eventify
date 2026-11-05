@@ -1,15 +1,17 @@
 package me.geetprince.Eventify.controller;
 
+import me.geetprince.Eventify.dto.ClubResponseDTO;
 import me.geetprince.Eventify.model.Club;
 import me.geetprince.Eventify.service.ClubService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/eventify/clubs")
@@ -20,12 +22,25 @@ public class ClubController {
         this.clubService = clubService;
     }
     @PostMapping("/register")
-    public ResponseEntity<Club> registerClub(@RequestBody Club club) {
+    public ResponseEntity<?> registerClub(@RequestBody Club club) {
+        Club registeredClub = clubService.registerClub(club);
+        ClubResponseDTO responseDTO = ClubResponseDTO.fromEntity(registeredClub);
+        return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
+    }
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getClubById(@PathVariable UUID id) {
         try {
-            Club registeredClub = clubService.registerClub(club);
-            return new ResponseEntity<>(registeredClub, HttpStatus.CREATED);
-        } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>((HttpHeaders) null, HttpStatus.BAD_REQUEST);
+            Club club = clubService.getClubById(id);
+            return ResponseEntity.ok(ClubResponseDTO.fromEntity(club));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Club not found.");
         }
+    }
+    @GetMapping
+    public ResponseEntity<List<ClubResponseDTO>> getAllClubs() {
+        List<ClubResponseDTO> clubs = clubService.getAllClubs().stream()
+                .map(ClubResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(clubs);
     }
 }
