@@ -1,11 +1,12 @@
 package me.geetprince.Eventify.service;
 
 import me.geetprince.Eventify.model.Event;
-import me.geetprince.Eventify.util.CSVExportUtil;
 import me.geetprince.Eventify.model.Registration;
 import me.geetprince.Eventify.repository.EventRepository;
 import me.geetprince.Eventify.repository.RegistrationRepository;
+import me.geetprince.Eventify.util.CSVExportUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -53,31 +54,49 @@ public class RegistrationService {
         registration.setEvent(event);
         return registrationRepo.save(registration);
     }
-    public List<Registration> getRegistrationsForEvent(UUID eventId) {
+
+    public List<Registration> getRegistrationsForEvent(UUID eventId, String authenticatedEmail) {
+        Event event = eventRepo.findById(eventId)
+                .orElseThrow(() -> new IllegalArgumentException("Event not found."));
+
+        if (!event.getClub().getEmail().equalsIgnoreCase(authenticatedEmail)) {
+            throw new AccessDeniedException("You are not authorized to view registrations for this event.");
+        }
+
         return registrationRepo.findByEvent_Id(eventId);
     }
-    public Registration checkInAttendee(UUID registrationId) {
+
+    public Registration checkInAttendee(UUID registrationId, String authenticatedEmail) {
         Registration registration = registrationRepo.findById(registrationId)
                 .orElseThrow(() -> new IllegalArgumentException("Registration ticket not found!"));
 
-        if (registration.getCheckedIn()) {
+        if (!registration.getEvent().getClub().getEmail().equalsIgnoreCase(authenticatedEmail)) {
+            throw new AccessDeniedException("You are not authorized to check in attendees for this event.");
+        }
+
+        if (Boolean.TRUE.equals(registration.getCheckedIn())) {
             throw new IllegalArgumentException("Attendee has already checked in!");
         }
         registration.setCheckedIn(true);
         return registrationRepo.save(registration);
     }
-    public String exportFilteredRegistrationsToCSV(UUID eventId, String department, Integer studyYear, Boolean checkedIn) {
-        // Fetch all registrations for the event
+
+    public String exportFilteredRegistrationsToCSV(UUID eventId, String department, Integer studyYear, Boolean checkedIn, String authenticatedEmail) {
+        Event event = eventRepo.findById(eventId)
+                .orElseThrow(() -> new IllegalArgumentException("Event not found."));
+
+        if (!event.getClub().getEmail().equalsIgnoreCase(authenticatedEmail)) {
+            throw new AccessDeniedException("You are not authorized to export registrations for this event.");
+        }
+
         List<Registration> allRegistrations = registrationRepo.findByEvent_Id(eventId);
 
-        // Apply dynamic filters using Java Streams
         List<Registration> filteredList = allRegistrations.stream()
                 .filter(reg -> department == null || department.equalsIgnoreCase(reg.getDepartment()))
                 .filter(reg -> studyYear == null || studyYear.equals(reg.getStudyYear()))
                 .filter(reg -> checkedIn == null || checkedIn.equals(reg.getCheckedIn()))
-                .toList(); // Note: toList() requires Java 16+, which you have!
+                .toList();
 
-        // Pass the filtered list to the CSV Utility we created
         return CSVExportUtil.generateRegistrationCSV(filteredList);
     }
 }

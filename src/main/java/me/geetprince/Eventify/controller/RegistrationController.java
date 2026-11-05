@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,16 +25,12 @@ public class RegistrationController {
         this.registrationService = registrationService;
     }
 
-    // 1. Create: Attendee Registers -> Gets QR Code in Response
+    // 1. Create: Attendee Registers -> Gets QR Code in Response (Public)
     @PostMapping
     public ResponseEntity<?> registerAttendee(@RequestBody Registration registration) {
-        // Saves the registration using your service
         Registration savedRegistration = registrationService.registerAttendee(registration);
-
-        // Generates the Base64 QR Code using the saved UUID
         String qrCode = QRCodeGenerator.generateQRCodeBase64(savedRegistration.getId().toString());
 
-        // Maps the data to the safe DTO that includes the QR image string
         RegistrationResponseDTO dto = new RegistrationResponseDTO();
         dto.setId(savedRegistration.getId());
         dto.setStudentName(savedRegistration.getAttendeeName());
@@ -44,30 +41,42 @@ public class RegistrationController {
         return new ResponseEntity<>(dto, HttpStatus.CREATED);
     }
 
-    // 2. Read: Get all registrations for a specific event
+    // 2. Read: Get all registrations for a specific event (Protected - Owner Club only)
     @GetMapping("/event/{eventId}")
-    public ResponseEntity<List<Registration>> getRegistrationsForEvent(@PathVariable UUID eventId) {
-        List<Registration> attendees = registrationService.getRegistrationsForEvent(eventId);
+    public ResponseEntity<List<Registration>> getRegistrationsForEvent(@PathVariable UUID eventId, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        List<Registration> attendees = registrationService.getRegistrationsForEvent(eventId, principal.getName());
         return ResponseEntity.ok(attendees);
     }
 
-    // 3. Update: Security Scans QR Code -> Hits this endpoint to check them in
+    // 3. Update: Authorized Club scans QR Code -> Checks attendee in (Protected - Owner Club only)
     @PutMapping("/{id}/check-in")
-    public ResponseEntity<?> checkInAttendee(@PathVariable UUID id) {
-        // Updates the checkedIn status using your service
-        Registration updatedRegistration = registrationService.checkInAttendee(id);
+    public ResponseEntity<?> checkInAttendee(@PathVariable UUID id, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Registration updatedRegistration = registrationService.checkInAttendee(id, principal.getName());
         return ResponseEntity.ok("Successfully checked in: " + updatedRegistration.getAttendeeName());
     }
+
+    // 4. Export: Download attendees CSV (Protected - Owner Club only)
     @GetMapping("/event/{eventId}/export")
     public ResponseEntity<String> exportRegistrations(
             @PathVariable UUID eventId,
             @RequestParam(required = false) String department,
             @RequestParam(required = false) Integer studyYear,
-            @RequestParam(required = false) Boolean checkedIn) {
+            @RequestParam(required = false) Boolean checkedIn,
+            Principal principal) {
 
-        String csvData = registrationService.exportFilteredRegistrationsToCSV(eventId, department, studyYear, checkedIn);
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
 
-        // Tell the client to download this as a CSV file
+        String csvData = registrationService.exportFilteredRegistrationsToCSV(
+                eventId, department, studyYear, checkedIn, principal.getName());
+
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"event_" + eventId + "_attendance.csv\"")
                 .header(HttpHeaders.CONTENT_TYPE, "text/csv")

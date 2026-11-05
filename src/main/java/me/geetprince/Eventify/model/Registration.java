@@ -12,7 +12,9 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "registrations")
+@Table(name = "registrations", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_registrations_event_attendee_email", columnNames = {"event_id", "attendee_email"})
+})
 @Data
 @NoArgsConstructor
 public class Registration {

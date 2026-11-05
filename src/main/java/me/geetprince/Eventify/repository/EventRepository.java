@@ -8,6 +8,8 @@ import java.util.UUID;
 
 public interface EventRepository extends JpaRepository<Event, UUID> {
 
+    List<Event> findByIsPublicTrue();
+
     List<Event> findByNameContainingIgnoreCase(String name);
 
     List<Event> findByClub_NameContainingIgnoreCase(String clubName);
