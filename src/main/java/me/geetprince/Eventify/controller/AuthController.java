@@ -1,5 +1,8 @@
 package me.geetprince.Eventify.controller;
 
+import jakarta.validation.Valid;
+import me.geetprince.Eventify.dto.ClubRequestDTO;
+import me.geetprince.Eventify.dto.ClubResponseDTO;
 import me.geetprince.Eventify.dto.LoginRequest;
 import me.geetprince.Eventify.model.Club;
 import me.geetprince.Eventify.service.ClubService;
@@ -24,6 +27,16 @@ public class AuthController {
     public AuthController(ClubService clubService, JwtUtil jwtUtil) {
         this.clubService = clubService;
         this.jwtUtil = jwtUtil;
+    }
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@Valid @RequestBody ClubRequestDTO requestDTO) {
+        Club club = new Club();
+        club.setName(requestDTO.getName());
+        club.setEmail(requestDTO.getEmail());
+        club.setPasswordHash(requestDTO.getPassword());
+        Club registeredClub = clubService.registerClub(club);
+        ClubResponseDTO responseDTO = ClubResponseDTO.fromEntity(registeredClub);
+        return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
     }
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {

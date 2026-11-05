@@ -49,4 +49,5 @@ public class ClubService {
     public List<Club> getAllClubs() {
         return clubRepo.findAll();
     }
+
 }

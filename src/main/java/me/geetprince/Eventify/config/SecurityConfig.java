@@ -27,7 +27,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/eventify/auth/login", "/eventify/clubs/**", "/error").permitAll()
+                        .requestMatchers("/eventify/auth/**", "/eventify/clubs/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/eventify/events/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/eventify/registrations").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/eventify/registrations/*/check-in").permitAll()

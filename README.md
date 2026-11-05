@@ -226,7 +226,8 @@ Implemented via [`@ControllerAdvice`](file:///Users/geet/projects/converting%20f
 | Method | Endpoint | Access Level | Description |
 |---|---|---|---|
 | `POST` | `/eventify/auth/login` | 🌐 **Public** | Authenticate club & issue JWT token |
-| `POST` | `/eventify/clubs/register` | 🌐 **Public** | Register new club account (hashes password) |
+| `POST` | `/eventify/auth/register` | 🌐 **Public** | Register new club account via Auth route |
+| `POST` | `/eventify/clubs/register` | 🌐 **Public** | Register new club account via Clubs route |
 | `GET` | `/eventify/clubs/{id}` | 🌐 **Public** | Fetch sanitized club profile |
 | `GET` | `/eventify/clubs` | 🌐 **Public** | Fetch all registered clubs |
 | `GET` | `/eventify/events` | 🌐 **Public** | List all events for attendees/public |
@@ -426,6 +427,28 @@ Base URL: `http://localhost:8080`
 }
 ```
 * **Error Response**: `401 Unauthorized`
+
+#### Club Signup / Registration (Auth Endpoint)
+* **Method & URL**: `POST /eventify/auth/register` (also supported on `/eventify/clubs/register`)
+* **Access**: 🌐 Public
+* **Description**: Registers a new club organizer account with BCrypt password encryption and input validation.
+* **Request Body** (`ClubRequestDTO`):
+```json
+{
+  "name": "Developers Club",
+  "email": "devs@university.edu",
+  "password": "StrongPassword123!"
+}
+```
+* **Success Response**: `201 Created` (`ClubResponseDTO`)
+```json
+{
+  "id": "7b8d424b-324e-4b62-959c-7cf05efbe41e",
+  "name": "Developers Club",
+  "email": "devs@university.edu"
+}
+```
+* **Error Response**: `400 Bad Request` with `ErrorResponse` model if validation fails or email already registered.
 
 ---
 
