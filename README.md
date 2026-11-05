@@ -1,6 +1,6 @@
 # Eventify 🎟️
 
-Eventify is a robust backend REST API built with **Spring Boot** and **PostgreSQL**, designed to manage college/organization clubs, event publishing, attendee registrations, eligibility filtering, attendee check-ins, and secure club authentication using JWT.
+Eventify is a robust backend REST API built with **Spring Boot** and **PostgreSQL**, designed to manage college/organization clubs, event publishing, attendee registrations, automated QR code ticketing, door/gate check-ins, and secure club authentication using JWT.
 
 ---
 
@@ -16,13 +16,21 @@ Eventify is a robust backend REST API built with **Spring Boot** and **PostgreSQ
   - [4. Data Transfer Objects (DTO) Pattern](#4-data-transfer-objects-dto-pattern)
   - [5. Centralized Error Handling (`GlobalExceptionHandler`)](#5-centralized-error-handling-globalexceptionhandler)
   - [6. Route Authorization Matrix (Public vs Protected)](#6-route-authorization-matrix-public-vs-protected)
+- [3rd Part of Development: QR Code Ticketing, Gate Check-in & Input Validation](#3rd-part-of-development)
+  - [1. Overview of 3rd Part Changes](#1-overview-of-3rd-part-changes)
+  - [2. Dynamic QR Code Generation (ZXing Engine)](#2-dynamic-qr-code-generation-zxing-engine)
+  - [3. Ticket Response Model (`RegistrationResponseDTO`)](#3-ticket-response-model-registrationresponsedto)
+  - [4. Fast Gate Check-in Flow & Security Exemption](#4-fast-gate-check-in-flow--security-exemption)
+  - [5. Double Check-in Prevention](#5-double-check-in-prevention)
+  - [6. Input Validation & DTO Hygiene (`ClubRequestDTO`)](#6-input-validation--dto-hygiene-clubrequestdto)
+  - [7. Validation Exception Handling](#7-validation-exception-handling)
 - [API Reference](#api-reference)
   - [Authentication Endpoints](#1-authentication-endpoints)
   - [Club Endpoints](#2-club-endpoints)
   - [Event Endpoints](#3-event-endpoints)
-  - [Registration Endpoints](#4-registration-endpoints)
+  - [Registration & Ticketing Endpoints](#4-registration--ticketing-endpoints)
 - [Eligibility & Validation Rules](#eligibility--validation-rules)
-- [Getting Started & Testing with JWT](#getting-started--testing-with-jwt)
+- [Getting Started & Testing with JWT & QR](#getting-started--testing-with-jwt--qr)
 
 ---
 
@@ -32,9 +40,10 @@ Eventify is a robust backend REST API built with **Spring Boot** and **PostgreSQ
 - **Framework**: Spring Boot 4.x / Spring Data JPA / Spring MVC
 - **Security**: Spring Security 6.x & `BCryptPasswordEncoder`
 - **Authentication**: JJWT (Java JWT `io.jsonwebtoken:jjwt-api:0.12.6`, `jjwt-impl`, `jjwt-jackson`)
+- **QR Code Engine**: Google ZXing (`com.google.zxing:core:3.5.3`, `com.google.zxing:javase:3.5.3`)
 - **Database**: PostgreSQL
 - **ORM / Persistence**: Hibernate / Jakarta Persistence (JPA)
-- **Validation**: Jakarta Bean Validation (`hibernate-validator`)
+- **Validation**: Jakarta Bean Validation (`hibernate-validator` / `spring-boot-starter-validation`)
 - **Boilerplate Reduction**: Project Lombok
 - **Build Tool**: Maven (`mvnw`)
 
@@ -49,19 +58,21 @@ src/main/java/me/geetprince/Eventify/
 ├── EventifyApplication.java           # Application entry point
 ├── config/
 │   ├── CorsConfig.java                # Cross-Origin Resource Sharing configuration
-│   ├── JwtAuthenticationFilter.java   # [Phase 2] Intercepts requests & validates Bearer tokens
-│   └── SecurityConfig.java            # [Phase 2] Route security rules, filter order & BCrypt bean
+│   ├── JwtAuthenticationFilter.java   # [Part 2] Intercepts requests & validates Bearer tokens
+│   └── SecurityConfig.java            # [Part 2 & 3] Route security, filter order, public check-in
 ├── controller/
-│   ├── AuthController.java            # [Phase 2] REST endpoints for Club login & JWT issuance
-│   ├── ClubController.java            # REST endpoints for Club registration & queries
+│   ├── AuthController.java            # [Part 2] REST endpoints for Club login & JWT issuance
+│   ├── ClubController.java            # [Part 2 & 3] REST endpoints for Club registration & queries
 │   ├── EventController.java           # REST endpoints for Event CRUD operations
-│   └── RegistrationController.java    # REST endpoints for Registrations & Check-ins
-├── dto/                               # [Phase 2] Data Transfer Objects
-│   ├── ClubResponseDTO.java           # Sanitized Club data excluding sensitive password hashes
-│   ├── ErrorResponse.java             # Standardized structured error response model
-│   └── LoginRequest.java              # Request body schema for login credentials
-├── exception/                         # [Phase 2] Centralized exception handling
-│   └── GlobalExceptionHandler.java    # @ControllerAdvice transforming exceptions into standard responses
+│   └── RegistrationController.java    # [Part 3] QR ticket generation & public gate check-ins
+├── dto/                               # Data Transfer Objects
+│   ├── ClubRequestDTO.java            # [Part 3] Validated payload for club registration
+│   ├── ClubResponseDTO.java           # [Part 2] Sanitized Club response (password omitted)
+│   ├── ErrorResponse.java             # [Part 2] Structured error payload model
+│   ├── LoginRequest.java              # [Part 2] Request body schema for login credentials
+│   └── RegistrationResponseDTO.java   # [Part 3] Ticket response containing Base64 QR code image
+├── exception/                         # Centralized exception handling
+│   └── GlobalExceptionHandler.java    # [Part 2 & 3] @ControllerAdvice handling business & validation errors
 ├── model/
 │   ├── Club.java                      # Club JPA entity (organizers)
 │   ├── Event.java                     # Event JPA entity (events hosted by clubs)
@@ -71,11 +82,12 @@ src/main/java/me/geetprince/Eventify/
 │   ├── EventRepository.java           # Spring Data JPA repository for Event
 │   └── RegistrationRepository.java    # Spring Data JPA repository for Registration
 ├── service/
-│   ├── ClubService.java               # Business logic, BCrypt hashing & credential verification
+│   ├── ClubService.java               # Business logic, BCrypt hashing & login verification
 │   ├── EventService.java              # Business logic & queries for Events
-│   └── RegistrationService.java       # Eligibility logic, registration & check-ins
-└── util/                              # [Phase 2] Utility helpers
-    └── JwtUtil.java                   # JWT creation, claims extraction & token validation
+│   └── RegistrationService.java       # [Part 3] Eligibility logic, QR ticket checks & check-ins
+└── util/                              # Utility helpers
+    ├── JwtUtil.java                   # [Part 2] JWT creation, claims extraction & validation
+    └── QRCodeGenerator.java           # [Part 3] Base64 250x250 PNG QR code generator via ZXing
 ```
 
 ---
@@ -162,7 +174,7 @@ In the **2nd Part of Development**, the application transitioned from an open pr
 | **Password Storage** | Plain text / unverified hashes | **BCrypt hashing** (`BCryptPasswordEncoder`) on club registration and matching on login |
 | **Data Hygiene** | Raw JPA entities returned in API responses | **Data Transfer Objects (DTOs)** (`ClubResponseDTO`) masking sensitive fields like `passwordHash` |
 | **Error Handling** | Scattered manual `try-catch` blocks in controllers | **Centralized `@ControllerAdvice`** (`GlobalExceptionHandler`) with standardized schema |
-| **Route Security** | Blanket permit on `/eventify/**` | **Fine-grained RBAC**: Public event browsing & student registration; protected event management & check-in |
+| **Route Security** | Blanket permit on `/eventify/**` | **Fine-grained RBAC**: Public event browsing & student registration; protected event management |
 | **Club Operations** | Only `POST /register` | Added `GET /eventify/clubs/{id}` and `GET /eventify/clubs` returning sanitized DTOs |
 
 ---
@@ -182,84 +194,29 @@ In the **2nd Part of Development**, the application transitioned from an open pr
 4. An authenticated `UsernamePasswordAuthenticationToken` is set into Spring's `SecurityContextHolder`.
 5. If absent on protected routes, Spring Security blocks the request with `403 Forbidden` / `401 Unauthorized`.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client as Frontend Client
-    participant Auth as AuthController
-    participant Svc as ClubService
-    participant Sec as JwtAuthFilter / Spring Security
-    participant API as Protected Endpoints (Events / Check-in)
-
-    Note over Client,Auth: Authentication Phase
-    Client->>Auth: POST /eventify/auth/login {email, password}
-    Auth->>Svc: verifyLogin(email, password)
-    Svc-->>Auth: Verified Club (BCrypt matched)
-    Auth-->>Client: 200 OK { "token": "eyJhbGciOi...", "clubId": "..." }
-
-    Note over Client,API: Authorized Access Phase
-    Client->>Sec: POST /eventify/events [Header: Authorization: Bearer <token>]
-    Sec->>Sec: Validate JWT & populate SecurityContextHolder
-    Sec->>API: Forward authenticated request
-    API-->>Client: 201 Created (Event created)
-```
-
 ---
 
 ### 3. Password Encryption (BCrypt)
 
 - Registered [`PasswordEncoder`](file:///Users/geet/projects/converting%20form%20py%20to%20java/Eventify/src/main/java/me/geetprince/Eventify/config/SecurityConfig.java) bean using `BCryptPasswordEncoder`.
-- **Registration**: When a club registers (`ClubService.registerClub`), the raw password is automatically encrypted using `passwordEncoder.encode(...)` before being persisted to PostgreSQL.
-- **Login**: When logging in (`ClubService.verifyLogin`), raw input password is authenticated using `passwordEncoder.matches(...)`. Invalid credentials throw an `IllegalArgumentException("Invalid email or password.")`.
+- **Registration**: When a club registers (`ClubService.registerClub`), raw passwords are encrypted with `passwordEncoder.encode(...)` before being persisted to PostgreSQL.
+- **Login**: When logging in (`ClubService.verifyLogin`), input passwords are authenticated using `passwordEncoder.matches(...)`. Invalid credentials throw an `IllegalArgumentException("Invalid email or password.")`.
 
 ---
 
 ### 4. Data Transfer Objects (DTO) Pattern
 
-To decouple database persistence models from API contracts and prevent data leakage:
-- **`ClubResponseDTO`**:
-  ```java
-  public class ClubResponseDTO {
-      private UUID id;
-      private String name;
-      private String email;
-      // Sensitive fields like passwordHash are omitted
-  }
-  ```
-- **`LoginRequest`**:
-  ```java
-  public class LoginRequest {
-      private String email;
-      private String password;
-  }
-  ```
-- **`ErrorResponse`**:
-  ```java
-  public class ErrorResponse {
-      private int status;
-      private String error;
-      private String message;
-      private LocalDateTime timestamp;
-  }
-  ```
+- **`ClubResponseDTO`**: Sanitized club object omitting `passwordHash`.
+- **`LoginRequest`**: Request payload schema for `{ email, password }`.
+- **`ErrorResponse`**: Standardized JSON schema for errors `{ status, error, message, timestamp }`.
 
 ---
 
 ### 5. Centralized Error Handling (`GlobalExceptionHandler`)
 
 Implemented via [`@ControllerAdvice`](file:///Users/geet/projects/converting%20form%20py%20to%20java/Eventify/src/main/java/me/geetprince/Eventify/exception/GlobalExceptionHandler.java):
-- **`IllegalArgumentException`**: Automatically mapped to `400 Bad Request` with an `ErrorResponse` containing the domain failure message (e.g. duplicate email, ineligibility).
-- **`Exception` (General fallback)**: Automatically mapped to `500 Internal Server Error` with a sanitized message preventing stack trace leaks.
-
-Example error response:
-```json
-{
-  "status": 400,
-  "error": "Bad Request",
-  "message": "A club with this email already exists.",
-  "timestamp": "2026-11-05T06:25:30.123456"
-}
-```
+- **`IllegalArgumentException`**: Automatically mapped to `400 Bad Request` with structured `ErrorResponse`.
+- **`Exception` (General fallback)**: Automatically mapped to `500 Internal Server Error` with a safe message.
 
 ---
 
@@ -273,11 +230,161 @@ Example error response:
 | `GET` | `/eventify/clubs` | 🌐 **Public** | Fetch all registered clubs |
 | `GET` | `/eventify/events` | 🌐 **Public** | List all events for attendees/public |
 | `GET` | `/eventify/events/{id}` | 🌐 **Public** | View specific event details |
-| `POST` | `/eventify/registrations` | 🌐 **Public** | Attendees register for an event |
+| `POST` | `/eventify/registrations` | 🌐 **Public** | Attendees register & receive QR ticket |
+| `PUT` | `/eventify/registrations/*/check-in` | 🌐 **Public** | Gate security scans ticket QR code |
 | `POST` | `/eventify/events` | 🔒 **Protected** (Bearer JWT) | Create a new event (Clubs only) |
 | `PUT` | `/eventify/events/{id}` | 🔒 **Protected** (Bearer JWT) | Update an event (Clubs only) |
 | `GET` | `/eventify/registrations/event/{eventId}` | 🔒 **Protected** (Bearer JWT) | View attendee list for an event |
-| `PUT` | `/eventify/registrations/{id}/checkin` | 🔒 **Protected** (Bearer JWT) | Check in an attendee at event entry |
+
+---
+
+<a name="3rd-part-of-development"></a>
+## 🎫 3rd Part of Development: QR Code Ticketing, Gate Check-in & Input Validation
+
+The **3rd Part of Development** introduced dynamic QR code ticket generation, high-speed gate check-in workflows, double check-in prevention, and bean input validation.
+
+### 1. Overview of 3rd Part Changes
+
+| Component / Feature | Description | Impact |
+|---|---|---|
+| **Google ZXing Engine** | Integrated `com.google.zxing:core:3.5.3` & `javase:3.5.3` | Enables in-memory 2D barcode / QR generation without external third-party services |
+| **`QRCodeGenerator` Utility** | Converts ticket UUIDs into 250x250 PNG QR code images | Returns Base64 strings for direct frontend `<img>` embedding |
+| **`RegistrationResponseDTO`** | Replaced raw entity return on registration | Delivers ticket details along with `qrCodeBase64` image string |
+| **Fast Gate Check-in** | `PUT /eventify/registrations/{id}/check-in` made public | Gate staff/volunteers can scan QR codes instantly without needing admin login |
+| **Double Check-in Guard** | Added check in `RegistrationService.checkInAttendee` | Rejects duplicate ticket entries with `"Attendee has already checked in!"` |
+| **`ClubRequestDTO` Validation** | Added Bean Validation (`@NotBlank`, `@Email`, `@Size`) | Enforces valid names (min 3 chars), email format, and passwords (min 6 chars) |
+| **Validation Exception Interceptor** | Added `MethodArgumentNotValidException` handler | Returns clean `400 Bad Request` with field-level validation messages |
+
+---
+
+### 2. Dynamic QR Code Generation (ZXing Engine)
+
+Implemented in [`QRCodeGenerator.java`](file:///Users/geet/projects/converting%20form%20py%20to%20java/Eventify/src/main/java/me/geetprince/Eventify/util/QRCodeGenerator.java):
+```java
+public class QRCodeGenerator {
+    public static String generateQRCodeBase64(String text) {
+        QRCodeWriter qrCodeWriter = new QRCodeWriter();
+        BitMatrix bitMatrix = qrCodeWriter.encode(text, BarcodeFormat.QR_CODE, 250, 250);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        MatrixToImageWriter.writeToStream(bitMatrix, "PNG", outputStream);
+        return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+    }
+}
+```
+- **Image Size**: 250 x 250 pixels.
+- **Output**: Base64 encoded PNG string.
+- **Payload**: The unique `UUID` of the registration ticket.
+- **Frontend Display**: Directly renderable in HTML/React via:
+  ```html
+  <img src="data:image/png;base64,{qrCodeBase64}" alt="Event Ticket QR" />
+  ```
+
+---
+
+### 3. Ticket Response Model (`RegistrationResponseDTO`)
+
+When a student registers, [`RegistrationController`](file:///Users/geet/projects/converting%20form%20py%20to%20java/Eventify/src/main/java/me/geetprince/Eventify/controller/RegistrationController.java) packages the ticket into a [`RegistrationResponseDTO`](file:///Users/geet/projects/converting%20form%20py%20to%20java/Eventify/src/main/java/me/geetprince/Eventify/dto/RegistrationResponseDTO.java):
+
+```json
+{
+  "id": "c86e082d-2092-4fcf-847d-8ebff82895ea",
+  "studentName": "Alex Johnson",
+  "studentEmail": "alex.johnson@university.edu",
+  "checkedIn": false,
+  "qrCodeBase64": "iVBORw0KGgoAAAANSUhEUgAAAPAAAADwCAYAAAA+VemSAAAAAXNSR0IArs4c6QAAA..."
+}
+```
+
+---
+
+### 4. Fast Gate Check-in Flow & Security Exemption
+
+Gate security staff or automated scanner devices at event venue entrances scan attendee tickets to verify admittance:
+1. **QR Code Scanning**: The scanner reads the registration `UUID` encoded in the QR image.
+2. **Hit Check-in API**: Sends a `PUT /eventify/registrations/{id}/check-in` request.
+3. **Public Gate Exemption**: Updated in [`SecurityConfig.java`](file:///Users/geet/projects/converting%20form%20py%20to%20java/Eventify/src/main/java/me/geetprince/Eventify/config/SecurityConfig.java) to allow gate personnel to perform check-ins without entering club credentials:
+   ```java
+   .requestMatchers(HttpMethod.PUT, "/eventify/registrations/*/check-in").permitAll()
+   ```
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Attendee as Student / Attendee
+    actor Scanner as Gate Scanner / Volunteer
+    participant Controller as RegistrationController
+    participant Service as RegistrationService
+    participant DB as PostgreSQL Database
+
+    Attendee->>Controller: POST /eventify/registrations (Register)
+    Controller->>Service: registerAttendee(registration)
+    Service->>DB: Save registration
+    Controller->>Controller: QRCodeGenerator.generateQRCodeBase64(UUID)
+    Controller-->>Attendee: 201 Created (RegistrationResponseDTO with QR Image)
+
+    Note over Attendee,Scanner: At Event Venue Gate
+    Attendee->>Scanner: Presents QR Ticket on Phone
+    Scanner->>Controller: PUT /eventify/registrations/{id}/check-in
+    Controller->>Service: checkInAttendee(id)
+    Service->>DB: Validate ticket & checkedIn status
+    Service->>DB: Update checkedIn = true
+    Controller-->>Scanner: 200 OK ("Successfully checked in: <Name>")
+```
+
+---
+
+### 5. Double Check-in Prevention
+
+In [`RegistrationService.java`](file:///Users/geet/projects/converting%20form%20py%20to%20java/Eventify/src/main/java/me/geetprince/Eventify/service/RegistrationService.java):
+```java
+public Registration checkInAttendee(UUID registrationId) {
+    Registration registration = registrationRepo.findById(registrationId)
+            .orElseThrow(() -> new IllegalArgumentException("Registration ticket not found!"));
+
+    if (registration.getCheckedIn()) {
+        throw new IllegalArgumentException("Attendee has already checked in!");
+    }
+    registration.setCheckedIn(true);
+    return registrationRepo.save(registration);
+}
+```
+- If a ticket has already been used to enter, subsequent scans are immediately rejected with `400 Bad Request` (`"Attendee has already checked in!"`), preventing ticket pass-backs or duplicate admittance.
+
+---
+
+### 6. Input Validation & DTO Hygiene (`ClubRequestDTO`)
+
+Club registration inputs are now validated before reaching service logic using [`ClubRequestDTO`](file:///Users/geet/projects/converting%20form%20py%20to%20java/Eventify/src/main/java/me/geetprince/Eventify/dto/ClubRequestDTO.java):
+- **`name`**: `@NotBlank(message = "Club name is required")`, `@Size(min = 3, message = "Club name must be at least 3 characters long")`
+- **`email`**: `@NotBlank(message = "Email is required")`, `@Email(message = "Please provide a valid email format")`
+- **`password`**: `@NotBlank(message = "Password is required")`, `@Size(min = 6, message = "Password must be at least 6 characters long")`
+
+---
+
+### 7. Validation Exception Handling
+
+Added to [`GlobalExceptionHandler.java`](file:///Users/geet/projects/converting%20form%20py%20to%20java/Eventify/src/main/java/me/geetprince/Eventify/exception/GlobalExceptionHandler.java):
+```java
+@ExceptionHandler(MethodArgumentNotValidException.class)
+public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
+    String errorMessage = ex.getBindingResult().getFieldErrors().get(0).getDefaultMessage();
+    ErrorResponse error = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            "Validation Failed",
+            errorMessage
+    );
+    return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+}
+```
+If a client submits an invalid registration payload, they receive:
+```json
+{
+  "status": 400,
+  "error": "Validation Failed",
+  "message": "Password must be at least 6 characters long",
+  "timestamp": "2026-11-05T07:30:00"
+}
+```
 
 ---
 
@@ -289,8 +396,7 @@ Base URL: `http://localhost:8080`
 
 #### Club Login
 * **Method & URL**: `POST /eventify/auth/login`
-* **Access**: Public
-* **Description**: Authenticates a club using email and password, returning a 24-hour signed JWT and the club ID.
+* **Access**: 🌐 Public
 * **Request Body**:
 ```json
 {
@@ -306,9 +412,6 @@ Base URL: `http://localhost:8080`
 }
 ```
 * **Error Response**: `401 Unauthorized`
-```text
-Invalid email or password.
-```
 
 ---
 
@@ -316,17 +419,20 @@ Invalid email or password.
 
 #### Register a Club
 * **Method & URL**: `POST /eventify/clubs/register`
-* **Access**: Public
-* **Description**: Registers a new club. Encrypts the raw password with BCrypt and returns the sanitized `ClubResponseDTO`.
-* **Request Body**:
+* **Access**: 🌐 Public
+* **Validation Rules**:
+  - `name`: Not blank, minimum 3 characters
+  - `email`: Not blank, valid email format
+  - `password`: Not blank, minimum 6 characters
+* **Request Body** (`ClubRequestDTO`):
 ```json
 {
   "name": "Robotics Club",
   "email": "robotics@university.edu",
-  "passwordHash": "MySecretPass!2026"
+  "password": "StrongPassword2026!"
 }
 ```
-* **Success Response**: `201 Created`
+* **Success Response**: `201 Created` (`ClubResponseDTO`)
 ```json
 {
   "id": "7b8d424b-324e-4b62-959c-7cf05efbe41e",
@@ -334,43 +440,17 @@ Invalid email or password.
   "email": "robotics@university.edu"
 }
 ```
-* **Error Response**: `400 Bad Request` (via `GlobalExceptionHandler`)
-```json
-{
-  "status": 400,
-  "error": "Bad Request",
-  "message": "A club with this email already exists.",
-  "timestamp": "2026-11-05T06:20:00"
-}
-```
+* **Error Response**: `400 Bad Request` with `ErrorResponse` model.
 
 #### Get Club by ID
 * **Method & URL**: `GET /eventify/clubs/{id}`
-* **Access**: Public
-* **Path Variables**: `id` (UUID)
-* **Success Response**: `200 OK`
-```json
-{
-  "id": "7b8d424b-324e-4b62-959c-7cf05efbe41e",
-  "name": "Robotics Club",
-  "email": "robotics@university.edu"
-}
-```
-* **Error Response**: `404 Not Found`
+* **Access**: 🌐 Public
+* **Success Response**: `200 OK` with `ClubResponseDTO`.
 
 #### Get All Clubs
 * **Method & URL**: `GET /eventify/clubs`
-* **Access**: Public
-* **Success Response**: `200 OK`
-```json
-[
-  {
-    "id": "7b8d424b-324e-4b62-959c-7cf05efbe41e",
-    "name": "Robotics Club",
-    "email": "robotics@university.edu"
-  }
-]
-```
+* **Access**: 🌐 Public
+* **Success Response**: `200 OK` with list of `ClubResponseDTO`.
 
 ---
 
@@ -399,7 +479,6 @@ Invalid email or password.
 }
 ```
 * **Success Response**: `201 Created` with saved Event object.
-* **Error Response**: `403 Forbidden` if Authorization header is missing or token is invalid.
 
 #### Get All Events
 * **Method & URL**: `GET /eventify/events`
@@ -409,24 +488,21 @@ Invalid email or password.
 #### Get Event by ID
 * **Method & URL**: `GET /eventify/events/{id}`
 * **Access**: 🌐 Public
-* **Path Variables**: `id` (UUID)
 * **Success Response**: `200 OK` with Event details.
-* **Error Response**: `404 Not Found`.
 
 #### Update Event
 * **Method & URL**: `PUT /eventify/events/{id}`
 * **Access**: 🔒 **Protected** (Requires `Authorization: Bearer <jwt_token>`)
-* **Request Body**: JSON with updated event fields.
 * **Success Response**: `200 OK` with updated Event.
 
 ---
 
-### 4. Registration Endpoints
+### 4. Registration & Ticketing Endpoints
 
-#### Register Attendee for an Event
+#### Register Attendee for an Event (Generates QR Ticket)
 * **Method & URL**: `POST /eventify/registrations`
 * **Access**: 🌐 Public
-* **Description**: Registers an attendee. Validates student department and year against event rules, and blocks duplicate registrations.
+* **Description**: Registers attendee, validates department/year eligibility and duplicate registration, generates 250x250 PNG QR code, and returns ticket DTO.
 * **Request Body**:
 ```json
 {
@@ -440,17 +516,14 @@ Invalid email or password.
   "studyYear": 3
 }
 ```
-* **Success Response**: `201 Created`
+* **Success Response**: `201 Created` (`RegistrationResponseDTO`)
 ```json
 {
   "id": "c86e082d-2092-4fcf-847d-8ebff82895ea",
-  "attendeeName": "Alex Johnson",
-  "attendeeEmail": "alex.johnson@university.edu",
-  "rollNumber": "CS2023045",
-  "department": "CSE",
-  "studyYear": 3,
+  "studentName": "Alex Johnson",
+  "studentEmail": "alex.johnson@university.edu",
   "checkedIn": false,
-  "registeredAt": "2026-11-05T04:40:00Z"
+  "qrCodeBase64": "iVBORw0KGgoAAAANSUhEUgAAAPAAAADwCAYAAAA+VemSAAAAAXNSR0IArs4c6QAAA..."
 }
 ```
 * **Error Responses** (`400 Bad Request`):
@@ -459,18 +532,22 @@ Invalid email or password.
   - `"Already registered for this event."`
   - `"Event not found."`
 
+#### Gate Check-in Attendee via QR Ticket
+* **Method & URL**: `PUT /eventify/registrations/{id}/check-in`
+* **Access**: 🌐 Public (Fast Gate Scanner Access)
+* **Path Variables**: `id` (UUID) - Ticket / Registration UUID decoded from QR Code
+* **Success Response**: `200 OK`
+```text
+Successfully checked in: Alex Johnson
+```
+* **Error Responses** (`400 Bad Request`):
+  - `"Registration ticket not found!"` (Invalid ticket)
+  - `"Attendee has already checked in!"` (Double check-in prevented)
+
 #### Get All Registrations for an Event
 * **Method & URL**: `GET /eventify/registrations/event/{eventId}`
 * **Access**: 🔒 **Protected** (Requires `Authorization: Bearer <jwt_token>`)
-* **Path Variables**: `eventId` (UUID)
 * **Success Response**: `200 OK` with list of registrations.
-
-#### Check-in Attendee
-* **Method & URL**: `PUT /eventify/registrations/{id}/checkin`
-* **Access**: 🔒 **Protected** (Requires `Authorization: Bearer <jwt_token>`)
-* **Path Variables**: `id` (UUID)
-* **Success Response**: `200 OK` with updated registration (`checkedIn = true`).
-* **Error Response**: `404 Not Found` if registration ID does not exist.
 
 ---
 
@@ -486,10 +563,11 @@ Invalid email or password.
    - Each attendee email can only register once per event (`existsByEvent_IdAndAttendeeEmail`).
 4. **Validation Constraints**:
    - Attendee study year must be between `1` and `5` (`@Min(1)`, `@Max(5)`).
+   - Club registration fields verified with `@NotBlank`, `@Email`, and `@Size`.
 
 ---
 
-## 💻 Getting Started & Testing with JWT
+## 💻 Getting Started & Testing with JWT & QR
 
 ### 1. Prerequisites
 - Java 27 SDK installed
@@ -501,36 +579,71 @@ Invalid email or password.
 ./mvnw clean spring-boot:run
 ```
 
-### 3. Testing the Secure Flow
+### 3. Step-by-Step Flow Testing
 
-1. **Register a Club**:
-   ```bash
-   curl -X POST http://localhost:8080/eventify/clubs/register \
-     -H "Content-Type: application/json" \
-     -d '{"name": "Tech Club", "email": "tech@club.com", "passwordHash": "pass123"}'
-   ```
+#### Step A: Register a Club
+```bash
+curl -X POST http://localhost:8080/eventify/clubs/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Developers Club",
+    "email": "devs@university.edu",
+    "password": "Password123!"
+  }'
+```
 
-2. **Login to Obtain JWT**:
-   ```bash
-   curl -X POST http://localhost:8080/eventify/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"email": "tech@club.com", "password": "pass123"}'
-   ```
-   *Response contains `{ "token": "<JWT_TOKEN>", "clubId": "..." }`.*
+#### Step B: Login & Retrieve JWT
+```bash
+curl -X POST http://localhost:8080/eventify/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "devs@university.edu",
+    "password": "Password123!"
+  }'
+```
+*Save the returned `token` and `clubId`.*
 
-3. **Access Protected Endpoints (Create Event)**:
-   ```bash
-   curl -X POST http://localhost:8080/eventify/events \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer <JWT_TOKEN>" \
-     -d '{
-       "name": "AI Summit",
-       "club": {"id": "<CLUB_ID>"},
-       "startTime": "2026-11-20T10:00:00Z",
-       "endTime": "2026-11-20T16:00:00Z",
-       "registrationDeadline": "2026-11-18T23:59:59Z",
-       "venue": "Hall A",
-       "allowedDepartments": "CSE,ECE",
-       "allowedStudyYears": "2,3"
-     }'
-   ```
+#### Step C: Create an Event (Authenticated)
+```bash
+curl -X POST http://localhost:8080/eventify/events \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
+  -d '{
+    "name": "Spring Hackathon",
+    "club": {"id": "<CLUB_ID>"},
+    "startTime": "2026-11-20T10:00:00Z",
+    "endTime": "2026-11-20T18:00:00Z",
+    "registrationDeadline": "2026-11-19T23:59:59Z",
+    "venue": "Hall A",
+    "allowedDepartments": "CSE,IT",
+    "allowedStudyYears": "1,2,3,4"
+  }'
+```
+*Save the returned event `id`.*
+
+#### Step D: Attendee Registers & Receives QR Ticket
+```bash
+curl -X POST http://localhost:8080/eventify/registrations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event": {"id": "<EVENT_ID>"},
+    "attendeeName": "Geet Prince",
+    "attendeeEmail": "geet@university.edu",
+    "rollNumber": "2026CS101",
+    "department": "CSE",
+    "studyYear": 3
+  }'
+```
+*The response returns `{ "id": "<TICKET_ID>", "qrCodeBase64": "..." }`.*
+
+#### Step E: Gate Check-in via QR Ticket ID
+```bash
+curl -X PUT http://localhost:8080/eventify/registrations/<TICKET_ID>/check-in
+```
+*Output: `Successfully checked in: Geet Prince`.*
+
+#### Step F: Attempt Duplicate Check-in (Should Fail)
+```bash
+curl -X PUT http://localhost:8080/eventify/registrations/<TICKET_ID>/check-in
+```
+*Output: `400 Bad Request` (`Attendee has already checked in!`)*.

@@ -45,5 +45,4 @@ public class Registration {
     @Column(name = "allowed_study_years")
     private String allowedStudyYears;
 
-
 }

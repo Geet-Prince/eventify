@@ -30,13 +30,12 @@ public class SecurityConfig {
                         .requestMatchers("/eventify/auth/login", "/eventify/clubs/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/eventify/events/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/eventify/registrations").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/eventify/registrations/*/check-in").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

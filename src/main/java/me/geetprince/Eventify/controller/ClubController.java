@@ -1,5 +1,7 @@
 package me.geetprince.Eventify.controller;
 
+import jakarta.validation.Valid;
+import me.geetprince.Eventify.dto.ClubRequestDTO;
 import me.geetprince.Eventify.dto.ClubResponseDTO;
 import me.geetprince.Eventify.model.Club;
 import me.geetprince.Eventify.service.ClubService;
@@ -21,12 +23,6 @@ public class ClubController {
     public ClubController(ClubService clubService) {
         this.clubService = clubService;
     }
-    @PostMapping("/register")
-    public ResponseEntity<?> registerClub(@RequestBody Club club) {
-        Club registeredClub = clubService.registerClub(club);
-        ClubResponseDTO responseDTO = ClubResponseDTO.fromEntity(registeredClub);
-        return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
-    }
     @GetMapping("/{id}")
     public ResponseEntity<?> getClubById(@PathVariable UUID id) {
         try {
@@ -42,5 +38,15 @@ public class ClubController {
                 .map(ClubResponseDTO::fromEntity)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(clubs);
+    }
+    @PostMapping("/register")
+    public ResponseEntity<?> registerClub(@Valid @RequestBody ClubRequestDTO requestDTO) {
+        Club club = new Club();
+        club.setName(requestDTO.getName());
+        club.setEmail(requestDTO.getEmail());
+        club.setPasswordHash(requestDTO.getPassword());
+        Club registeredClub = clubService.registerClub(club);
+        ClubResponseDTO responseDTO = ClubResponseDTO.fromEntity(registeredClub);
+        return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
     }
 }

@@ -14,7 +14,7 @@ import java.util.UUID;
 public class RegistrationService {
 
     private final RegistrationRepository registrationRepo;
-    private final EventRepository eventRepo; // Added to fetch event rules
+    private final EventRepository eventRepo;
 
     @Autowired
     public RegistrationService(RegistrationRepository registrationRepo, EventRepository eventRepo) {
@@ -49,18 +49,19 @@ public class RegistrationService {
         if (registrationRepo.existsByEvent_IdAndAttendeeEmail(event.getId(), registration.getAttendeeEmail())) {
             throw new IllegalArgumentException("Already registered for this event.");
         }
-
-        registration.setEvent(event);   // use the loaded event, not the JSON stub
+        registration.setEvent(event);
         return registrationRepo.save(registration);
     }
-
     public List<Registration> getRegistrationsForEvent(UUID eventId) {
         return registrationRepo.findByEvent_Id(eventId);
     }
-
     public Registration checkInAttendee(UUID registrationId) {
         Registration registration = registrationRepo.findById(registrationId)
-                .orElseThrow(() -> new IllegalArgumentException("Registration not found."));
+                .orElseThrow(() -> new IllegalArgumentException("Registration ticket not found!"));
+
+        if (registration.getCheckedIn()) {
+            throw new IllegalArgumentException("Attendee has already checked in!");
+        }
         registration.setCheckedIn(true);
         return registrationRepo.save(registration);
     }

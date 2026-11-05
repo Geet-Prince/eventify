@@ -1,7 +1,9 @@
 package me.geetprince.Eventify.controller;
 
+import me.geetprince.Eventify.dto.RegistrationResponseDTO;
 import me.geetprince.Eventify.model.Registration;
 import me.geetprince.Eventify.service.RegistrationService;
+import me.geetprince.Eventify.util.QRCodeGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,33 +15,46 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/eventify/registrations")
 public class RegistrationController {
+
     private final RegistrationService registrationService;
+
     @Autowired
     public RegistrationController(RegistrationService registrationService) {
         this.registrationService = registrationService;
     }
+
+    // 1. Create: Attendee Registers -> Gets QR Code in Response
     @PostMapping
     public ResponseEntity<?> registerAttendee(@RequestBody Registration registration) {
-        try {
-            Registration savedRegistration = registrationService.registerAttendee(registration);
-            return new ResponseEntity<>(savedRegistration, HttpStatus.CREATED);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+        // Saves the registration using your service
+        Registration savedRegistration = registrationService.registerAttendee(registration);
+
+        // Generates the Base64 QR Code using the saved UUID
+        String qrCode = QRCodeGenerator.generateQRCodeBase64(savedRegistration.getId().toString());
+
+        // Maps the data to the safe DTO that includes the QR image string
+        RegistrationResponseDTO dto = new RegistrationResponseDTO();
+        dto.setId(savedRegistration.getId());
+        dto.setStudentName(savedRegistration.getAttendeeName());
+        dto.setStudentEmail(savedRegistration.getAttendeeEmail());
+        dto.setCheckedIn(savedRegistration.getCheckedIn());
+        dto.setQrCodeBase64(qrCode);
+
+        return new ResponseEntity<>(dto, HttpStatus.CREATED);
     }
+
+    // 2. Read: Get all registrations for a specific event
     @GetMapping("/event/{eventId}")
     public ResponseEntity<List<Registration>> getRegistrationsForEvent(@PathVariable UUID eventId) {
         List<Registration> attendees = registrationService.getRegistrationsForEvent(eventId);
         return ResponseEntity.ok(attendees);
     }
-    @PutMapping("/{id}/checkin")
-    public ResponseEntity<?> checkInAttendee(@PathVariable UUID id) {
-        try {
-            Registration checkedInAttendee = registrationService.checkInAttendee(id);
-            return ResponseEntity.ok(checkedInAttendee);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
-    }
 
+    // 3. Update: Security Scans QR Code -> Hits this endpoint to check them in
+    @PutMapping("/{id}/check-in")
+    public ResponseEntity<?> checkInAttendee(@PathVariable UUID id) {
+        // Updates the checkedIn status using your service
+        Registration updatedRegistration = registrationService.checkInAttendee(id);
+        return ResponseEntity.ok("Successfully checked in: " + updatedRegistration.getAttendeeName());
+    }
 }
