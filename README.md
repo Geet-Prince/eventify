@@ -84,8 +84,9 @@ src/main/java/me/geetprince/Eventify/
 ├── service/
 │   ├── ClubService.java               # Business logic, BCrypt hashing & login verification
 │   ├── EventService.java              # Business logic & queries for Events
-│   └── RegistrationService.java       # [Part 3] Eligibility logic, QR ticket checks & check-ins
+│   └── RegistrationService.java       # [Part 3] Eligibility logic, QR ticket checks, check-ins & CSV export
 └── util/                              # Utility helpers
+    ├── CSVExportUtil.java             # [Part 3] Dynamic CSV export generator with special char escaping
     ├── JwtUtil.java                   # [Part 2] JWT creation, claims extraction & validation
     └── QRCodeGenerator.java           # [Part 3] Base64 250x250 PNG QR code generator via ZXing
 ```
@@ -232,6 +233,7 @@ Implemented via [`@ControllerAdvice`](file:///Users/geet/projects/converting%20f
 | `GET` | `/eventify/events/{id}` | 🌐 **Public** | View specific event details |
 | `POST` | `/eventify/registrations` | 🌐 **Public** | Attendees register & receive QR ticket |
 | `PUT` | `/eventify/registrations/*/check-in` | 🌐 **Public** | Gate security scans ticket QR code |
+| `GET` | `/eventify/registrations/event/*/export` | 🌐 **Public** | Download filtered attendance report as CSV |
 | `POST` | `/eventify/events` | 🔒 **Protected** (Bearer JWT) | Create a new event (Clubs only) |
 | `PUT` | `/eventify/events/{id}` | 🔒 **Protected** (Bearer JWT) | Update an event (Clubs only) |
 | `GET` | `/eventify/registrations/event/{eventId}` | 🔒 **Protected** (Bearer JWT) | View attendee list for an event |
@@ -254,6 +256,7 @@ The **3rd Part of Development** introduced dynamic QR code ticket generation, hi
 | **Double Check-in Guard** | Added check in `RegistrationService.checkInAttendee` | Rejects duplicate ticket entries with `"Attendee has already checked in!"` |
 | **`ClubRequestDTO` Validation** | Added Bean Validation (`@NotBlank`, `@Email`, `@Size`) | Enforces valid names (min 3 chars), email format, and passwords (min 6 chars) |
 | **Validation Exception Interceptor** | Added `MethodArgumentNotValidException` handler | Returns clean `400 Bad Request` with field-level validation messages |
+| **Filtered CSV Attendance Export** | `GET /eventify/registrations/event/{eventId}/export` | Streams custom CSV download filtered by department, study year, and check-in status |
 
 ---
 
@@ -385,6 +388,17 @@ If a client submits an invalid registration payload, they receive:
   "timestamp": "2026-11-05T07:30:00"
 }
 ```
+
+---
+
+### 8. Dynamic CSV Attendance Export
+
+Implemented via [`CSVExportUtil.java`](file:///Users/geet/projects/converting%20form%20py%20to%20java/Eventify/src/main/java/me/geetprince/Eventify/util/CSVExportUtil.java):
+- **Features**:
+  - Dynamically filters registrations using Java 16+ streams based on query params (`department`, `studyYear`, `checkedIn`).
+  - Escapes special characters (quotes, commas, line breaks) to guarantee standard RFC 4180 CSV compliance.
+  - Automatically formats the HTTP header with `Content-Disposition: attachment; filename="event_<eventId>_attendance.csv"`.
+- **Columns**: `Name,Email,Roll Number,Department,Study Year,Checked In,Registration Date`.
 
 ---
 
@@ -548,6 +562,26 @@ Successfully checked in: Alex Johnson
 * **Method & URL**: `GET /eventify/registrations/event/{eventId}`
 * **Access**: 🔒 **Protected** (Requires `Authorization: Bearer <jwt_token>`)
 * **Success Response**: `200 OK` with list of registrations.
+
+#### Export Registrations to CSV
+* **Method & URL**: `GET /eventify/registrations/event/{eventId}/export`
+* **Access**: 🌐 Public
+* **Query Parameters** (All optional):
+  - `department` (String) - e.g. `CSE`
+  - `studyYear` (Integer) - e.g. `3`
+  - `checkedIn` (Boolean) - `true` or `false`
+* **Headers in Response**:
+  - `Content-Type: text/csv`
+  - `Content-Disposition: attachment; filename="event_<eventId>_attendance.csv"`
+* **Example Usage**:
+  ```bash
+  curl -O "http://localhost:8080/eventify/registrations/event/<EVENT_ID>/export?department=CSE&checkedIn=true"
+  ```
+* **Success Response**: `200 OK` (Streams CSV file)
+```csv
+Name,Email,Roll Number,Department,Study Year,Checked In,Registration Date
+Alex Johnson,alex.johnson@university.edu,CS2023045,CSE,3,Yes,2026-11-05T04:40:00Z
+```
 
 ---
 

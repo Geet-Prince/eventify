@@ -5,6 +5,7 @@ import me.geetprince.Eventify.model.Registration;
 import me.geetprince.Eventify.service.RegistrationService;
 import me.geetprince.Eventify.util.QRCodeGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -56,5 +57,20 @@ public class RegistrationController {
         // Updates the checkedIn status using your service
         Registration updatedRegistration = registrationService.checkInAttendee(id);
         return ResponseEntity.ok("Successfully checked in: " + updatedRegistration.getAttendeeName());
+    }
+    @GetMapping("/event/{eventId}/export")
+    public ResponseEntity<String> exportRegistrations(
+            @PathVariable UUID eventId,
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) Integer studyYear,
+            @RequestParam(required = false) Boolean checkedIn) {
+
+        String csvData = registrationService.exportFilteredRegistrationsToCSV(eventId, department, studyYear, checkedIn);
+
+        // Tell the client to download this as a CSV file
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"event_" + eventId + "_attendance.csv\"")
+                .header(HttpHeaders.CONTENT_TYPE, "text/csv")
+                .body(csvData);
     }
 }

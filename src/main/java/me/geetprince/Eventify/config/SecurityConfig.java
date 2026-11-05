@@ -31,6 +31,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/eventify/events/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/eventify/registrations").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/eventify/registrations/*/check-in").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/eventify/registrations/event/*/export").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
