@@ -30,6 +30,7 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-prince.raj.ds@gmail.com}
       SENDER_EMAIL: ${SENDER_EMAIL:-prince.raj.ds@gmail.com}
       APP_BASE_URL: ${APP_BASE_URL:-https://eventify-backend-bcb0.onrender.com}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://eventify.geetprince.me}
     ports:
       - "8080:8080"
     depends_on:

@@ -1,0 +1,86 @@
+# ============================================================
+# docker-compose.local.yml  –  Full local stack for development
+#
+# Services:
+#   • postgres-db   – PostgreSQL 17 (port 5432)
+#   • mailhog       – Fake SMTP + web UI (SMTP:1025, UI:8025)
+#   • eventify-backend – Spring Boot app (port 8080)
+#
+# Usage:
+#   docker compose -f docker-compose.local.yml --env-file .env.local up --build
+#
+# View emails: http://localhost:8025
+# API:         http://localhost:8080
+# ============================================================
+
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────
+  postgres-db:
+    image: postgres:17
+    container_name: eventify-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: eventify
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d eventify"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── MailHog (fake SMTP + web inbox) ───────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: eventify-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP – Spring Boot sends here
+      - "8025:8025"   # Web UI – open http://localhost:8025
+    logging:
+      driver: none    # keep compose output clean
+
+  # ── Spring Boot Backend ───────────────────────────────────
+  eventify-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eventify-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/eventify
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      # SMTP → MailHog inside the Docker network
+      SPRING_MAIL_HOST: mailhog
+      SPRING_MAIL_PORT: 1025
+      SPRING_MAIL_USERNAME: ""
+      SPRING_MAIL_PASSWORD: ""
+      # App identity
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@localhost}
+      SENDER_EMAIL: ${SENDER_EMAIL:-noreply@localhost}
+      APP_BASE_URL: http://localhost:8080
+      APP_FRONTEND_URL: http://localhost:3000
+      # Developer-friendly JPA
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+
+volumes:
+  postgres_local_data:
