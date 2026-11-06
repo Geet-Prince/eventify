@@ -1,11 +1,13 @@
 package me.geetprince.Eventify.service;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
 import me.geetprince.Eventify.model.Club;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -30,7 +32,7 @@ public class EmailService {
     @Value("${app.admin.email:}")
     private String adminEmail;
 
-    @Value("${app.mail.sender-email:noreply@eventify.com}")
+    @Value("${app.mail.sender-email:prince.raj.ds@gmail.com}")
     private String senderEmail;
 
     @Value("${app.base-url:https://eventify-backend-bcb0.onrender.com}")
@@ -39,9 +41,35 @@ public class EmailService {
     @Value("${app.frontend-url:https://eventify.geetprince.me}")
     private String frontendUrl;
 
-    @Autowired(required = false)
-    public EmailService(JavaMailSender mailSender) {
+    public EmailService() {
+        this.mailSender = null;
+    }
+
+    @Autowired
+    public EmailService(@Nullable JavaMailSender mailSender) {
         this.mailSender = mailSender;
+    }
+
+    @PostConstruct
+    public void init() {
+        if (brevoApiKey != null && !brevoApiKey.isBlank()) {
+            log.info("EmailService initialized: Brevo HTTPS REST API (Port 443) is ACTIVE. Key prefix: {}..., Sender: {}",
+                    brevoApiKey.substring(0, Math.min(10, brevoApiKey.length())), senderEmail);
+        } else {
+            log.warn("EmailService initialized: BREVO_API_KEY is NOT SET! Outbound emails will attempt SMTP on port 587 (blocked on Render Free tier).");
+        }
+    }
+
+    public boolean isBrevoConfigured() {
+        return brevoApiKey != null && !brevoApiKey.isBlank();
+    }
+
+    public String getSenderEmail() {
+        return senderEmail;
+    }
+
+    public String getAdminEmail() {
+        return adminEmail;
     }
 
     @Async
@@ -124,15 +152,20 @@ public class EmailService {
     }
 
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
+        log.info("Preparing to send email to '{}' with subject '{}'", to, subject);
+
         // Strategy 1: Brevo HTTPS REST API (Port 443) – Recommended for Render Free tier
         // Render blocks outbound SMTP ports 25, 465, and 587. HTTPS Port 443 is always open.
         if (brevoApiKey != null && !brevoApiKey.isBlank()) {
             try {
+                log.info("Dispatching email to '{}' via Brevo HTTPS REST API (Port 443)...", to);
                 sendViaBrevoApi(to, subject, htmlBody);
                 return;
             } catch (Exception e) {
                 log.error("Failed to send email via Brevo REST API, attempting SMTP fallback: {}", e.getMessage(), e);
             }
+        } else {
+            log.warn("BREVO_API_KEY is NOT set in environment! Outbound SMTP on port 587 will fail on Render Free Tier.");
         }
 
         // Strategy 2: JavaMail SMTP (Port 587/2525) – Used locally with MailHog or on paid tiers
@@ -176,7 +209,7 @@ public class EmailService {
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
-            log.info("Email successfully dispatched via Brevo HTTPS API (Port 443) to {}", to);
+            log.info("Email successfully dispatched via Brevo HTTPS API (Port 443) to {}. Response: {}", to, response.body());
         } else {
             throw new RuntimeException("Brevo API error HTTP " + response.statusCode() + ": " + response.body());
         }

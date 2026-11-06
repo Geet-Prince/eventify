@@ -9,6 +9,7 @@ import me.geetprince.Eventify.dto.LoginRequest;
 import me.geetprince.Eventify.model.Club;
 import me.geetprince.Eventify.model.RefreshToken;
 import me.geetprince.Eventify.service.ClubService;
+import me.geetprince.Eventify.service.EmailService;
 import me.geetprince.Eventify.service.LoginRateLimiterService;
 import me.geetprince.Eventify.service.RefreshTokenService;
 import me.geetprince.Eventify.util.JwtUtil;
@@ -27,6 +28,7 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final LoginRateLimiterService rateLimiterService;
     private final RefreshTokenService refreshTokenService;
+    private final EmailService emailService;
 
     @org.springframework.beans.factory.annotation.Value("${app.frontend-url:https://eventify.geetprince.me}")
     private String frontendUrl;
@@ -36,11 +38,23 @@ public class AuthController {
             ClubService clubService,
             JwtUtil jwtUtil,
             LoginRateLimiterService rateLimiterService,
-            RefreshTokenService refreshTokenService) {
+            RefreshTokenService refreshTokenService,
+            EmailService emailService) {
         this.clubService = clubService;
         this.jwtUtil = jwtUtil;
         this.rateLimiterService = rateLimiterService;
         this.refreshTokenService = refreshTokenService;
+        this.emailService = emailService;
+    }
+
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Object>> getStatus() {
+        Map<String, Object> status = new HashMap<>();
+        status.put("status", "UP");
+        status.put("brevoConfigured", emailService.isBrevoConfigured());
+        status.put("senderEmail", emailService.getSenderEmail());
+        status.put("adminEmail", emailService.getAdminEmail());
+        return ResponseEntity.ok(status);
     }
 
     @PostMapping("/register")
