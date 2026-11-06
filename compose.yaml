@@ -1,41 +1,71 @@
+# ============================================================
+# compose.yaml  –  Production deployment on Render
+#
+# Architecture:
+#   • PostgreSQL    → Render Managed PostgreSQL (external service)
+#                     Connection via SPRING_DATASOURCE_URL env var
+#   • Backend       → Docker container deployed on Render Web Service
+#   • Frontend      → Vercel (separate deployment, not in this file)
+#   • Email (SMTP)  → Brevo relay (external, via env vars)
+#
+# DO NOT define a postgres-db service here.
+# Render's managed DB is provisioned separately and its internal
+# connection string is injected via SPRING_DATASOURCE_URL.
+#
+# Render injects these env vars automatically when you link the
+# PostgreSQL service to this Web Service in the Render dashboard:
+#   DATABASE_URL  →  copy this into SPRING_DATASOURCE_URL
+#
+# Usage (Render builds this automatically on git push):
+#   render deploy  OR  push to the connected GitHub branch
+# ============================================================
+
 services:
-  postgres-db:
-    image: postgres:17
-    environment:
-      POSTGRES_DB: eventify
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d eventify" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
 
   eventify-backend:
     build:
       context: .
       dockerfile: Dockerfile
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/eventify
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      # ── Database (Render Managed PostgreSQL) ─────────────────
+      # Set SPRING_DATASOURCE_URL in Render dashboard env vars to
+      # the Internal Database URL from your Render PostgreSQL service.
+      # Format: jdbc:postgresql://<host>/<dbname>?user=<user>&password=<pass>
+      # OR use the three separate vars below.
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+
+      # ── JPA / Hibernate ───────────────────────────────────────
+      # Use 'update' so Hibernate safely generates or updates required tables on Render
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-update}
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
+
+      # ── Security ──────────────────────────────────────────────
       JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+      JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-604800000}
+
+      # ── Email (Brevo SMTP) ────────────────────────────────────
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp-relay.brevo.com}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
-      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
-      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-prince.raj.ds@gmail.com}
-      SENDER_EMAIL: ${SENDER_EMAIL:-prince.raj.ds@gmail.com}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
+
+      # ── App identity ──────────────────────────────────────────
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      SENDER_EMAIL: ${SENDER_EMAIL}
       APP_BASE_URL: ${APP_BASE_URL:-https://eventify-backend-bcb0.onrender.com}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://eventify.geetprince.me}
+
+      # ── CORS (Vercel frontend + custom domain) ────────────────
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://eventify-frontend-beta.vercel.app,https://eventify.geetprince.me}
+
+      # ── Logging ───────────────────────────────────────────────
+      SECURITY_LOG_LEVEL: ${SECURITY_LOG_LEVEL:-WARN}
+
     ports:
       - "8080:8080"
-    depends_on:
-      postgres-db:
-        condition: service_healthy
 
-volumes:
-  postgres_data:
+# No volumes section: Render Managed PostgreSQL handles its own persistence.
+# No postgres-db service: it is a Render platform service, not a Docker container.

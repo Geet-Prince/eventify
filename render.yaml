@@ -1,0 +1,84 @@
+# ============================================================
+# render.yaml  –  Render Infrastructure as Code (IaC) blueprint
+#
+# Declares the full Eventify backend infrastructure on Render:
+#   • eventify-backend  → Web Service (Docker, Spring Boot)
+#   • eventify-db       → Render Managed PostgreSQL 17
+#
+# Frontend (Vercel) is managed separately at vercel.com.
+#
+# To deploy:
+#   1. Push this file to your GitHub repo (connected to Render)
+#   2. In Render dashboard → "New Blueprint" → select this repo
+#   3. Render auto-provisions both services and links the DB
+#
+# Render docs: https://render.com/docs/blueprint-spec
+# ============================================================
+
+services:
+
+  # ── Spring Boot Backend (Docker) ───────────────────────────────────────────
+  - type: web
+    name: eventify-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: oregon                      # match your Render DB region
+    plan: free                          # upgrade to starter for no sleep
+    healthCheckPath: /eventify/auth/register   # returns 405 when alive
+    autoDeploy: true
+
+    envVars:
+      # ── Database (auto-linked from the Render PostgreSQL below) ───────────
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: eventify-db
+          property: connectionString    # Render injects the JDBC URL
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: eventify-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: eventify-db
+          property: password
+
+      # ── JPA ───────────────────────────────────────────────────────────────
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: update                   # auto-creates tables if missing on Render PostgreSQL
+
+      # ── JWT ───────────────────────────────────────────────────────────────
+      - key: JWT_SECRET
+        generateValue: true             # Render generates a secure random value
+
+      # ── SMTP (Brevo) – set these in Render dashboard ───────────────────────
+      - key: SPRING_MAIL_HOST
+        value: smtp-relay.brevo.com
+      - key: SPRING_MAIL_PORT
+        value: "587"
+      - key: SPRING_MAIL_USERNAME
+        sync: false                     # set manually in Render dashboard
+      - key: SPRING_MAIL_PASSWORD
+        sync: false
+
+      # ── Admin & Sender ────────────────────────────────────────────────────
+      - key: ADMIN_EMAIL
+        sync: false                     # set manually: prince.raj.ds@gmail.com
+      - key: SENDER_EMAIL
+        sync: false                     # set manually: prince.raj.ds@gmail.com
+
+      # ── App Identity ──────────────────────────────────────────────────────
+      - key: APP_BASE_URL
+        value: https://eventify-backend-bcb0.onrender.com
+      - key: APP_FRONTEND_URL
+        value: https://eventify.geetprince.me
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://eventify-frontend-beta.vercel.app,https://eventify.geetprince.me
+
+  # ── Render Managed PostgreSQL 17 ───────────────────────────────────────────
+databases:
+  - name: eventify-db
+    databaseName: eventify
+    user: eventify_user
+    plan: free                          # upgrade to starter for persistent storage
+    region: oregon                      # must match the web service region above
+    postgresMajorVersion: 17
