@@ -1,5 +1,6 @@
 package me.geetprince.Eventify.controller;
 
+import me.geetprince.Eventify.dto.EventResponseDTO;
 import me.geetprince.Eventify.model.Club;
 import me.geetprince.Eventify.model.Event;
 import me.geetprince.Eventify.service.ClubService;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/eventify/events")
@@ -26,22 +28,26 @@ public class EventController {
     }
 
     @PostMapping
-    public ResponseEntity<Event> createEvent(@RequestBody Event event, Principal principal) {
+    public ResponseEntity<EventResponseDTO> createEvent(@RequestBody Event event, Principal principal) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         Club authenticatedClub = clubService.getClubByEmail(principal.getName());
         event.setClub(authenticatedClub);
-        return new ResponseEntity<>(eventService.createEvent(event), HttpStatus.CREATED);
+        Event savedEvent = eventService.createEvent(event);
+        return new ResponseEntity<>(EventResponseDTO.fromEntity(savedEvent), HttpStatus.CREATED);
     }
 
     @GetMapping
-    public ResponseEntity<List<Event>> getAllEvents() {
-        return ResponseEntity.ok(eventService.getPublicEvents());
+    public ResponseEntity<List<EventResponseDTO>> getAllEvents() {
+        List<EventResponseDTO> dtos = eventService.getPublicEvents().stream()
+                .map(EventResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Event> getEventById(@PathVariable UUID id, Principal principal) {
+    public ResponseEntity<EventResponseDTO> getEventById(@PathVariable UUID id, Principal principal) {
         try {
             Event event = eventService.getEventById(id);
             if (!event.isPublic()) {
@@ -49,19 +55,20 @@ public class EventController {
                     return ResponseEntity.notFound().build();
                 }
             }
-            return ResponseEntity.ok(event);
+            return ResponseEntity.ok(EventResponseDTO.fromEntity(event));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Event> updateEvent(@PathVariable UUID id, @RequestBody Event eventDetails, Principal principal) {
+    public ResponseEntity<EventResponseDTO> updateEvent(@PathVariable UUID id, @RequestBody Event eventDetails, Principal principal) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         try {
-            return ResponseEntity.ok(eventService.updateEvent(id, eventDetails, principal.getName()));
+            Event updated = eventService.updateEvent(id, eventDetails, principal.getName());
+            return ResponseEntity.ok(EventResponseDTO.fromEntity(updated));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }

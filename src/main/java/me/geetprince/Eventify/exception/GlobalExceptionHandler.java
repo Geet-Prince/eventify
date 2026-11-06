@@ -27,10 +27,24 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(org.springframework.dao.DataIntegrityViolationException ex) {
+        log.error("DataIntegrityViolationException: ", ex);
+        String rootMsg = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        
+        String userFriendlyMsg = "A database constraint violation occurred.";
+        if (rootMsg != null) {
+            if (rootMsg.contains("uk_registrations_event_attendee_email") || rootMsg.contains("duplicate key value")) {
+                userFriendlyMsg = "An attendee with this email is already registered for this event.";
+            } else if (rootMsg.contains("value too long")) {
+                userFriendlyMsg = "One of the provided fields exceeds the maximum allowable length: " + rootMsg;
+            } else {
+                userFriendlyMsg = rootMsg;
+            }
+        }
+        
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
-                "Duplicate Registration",
-                "An attendee with this email is already registered for this event."
+                "Data Integrity Violation",
+                userFriendlyMsg
         );
         return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }

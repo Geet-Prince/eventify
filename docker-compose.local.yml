@@ -61,6 +61,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       # JWT
       JWT_SECRET: ${JWT_SECRET}
+      # Brevo API (Real email delivery)
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
       # SMTP → MailHog inside the Docker network
       SPRING_MAIL_HOST: mailhog
       SPRING_MAIL_PORT: 1025

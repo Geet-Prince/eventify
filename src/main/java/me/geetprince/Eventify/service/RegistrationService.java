@@ -8,11 +8,13 @@ import me.geetprince.Eventify.util.CSVExportUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
 @Service
+@Transactional
 public class RegistrationService {
 
     private final RegistrationRepository registrationRepo;

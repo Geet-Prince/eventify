@@ -30,20 +30,21 @@ public class Event {
     private OffsetDateTime registrationDeadline;
     @Column(columnDefinition = "TEXT")
     private String details;
-    @Column(name = "is_Published",nullable = false)
+    @Column(name = "is_published",nullable = false)
+    @com.fasterxml.jackson.annotation.JsonProperty("isPublic")
     private boolean isPublic=false;
     @Column(nullable = false,length = 300)
     private String venue;
     @Column(columnDefinition = "TEXT")
     private String guests;
-    @Column(name = "image_link")
+    @Column(name = "image_link", columnDefinition = "TEXT")
     private String imageLink;
     @CreationTimestamp
     @Column(name = "created_at",updatable = false,columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private OffsetDateTime createdAt;
-    @Column(name = "allowed_departments")
+    @Column(name = "allowed_departments", columnDefinition = "TEXT")
     private String allowedDepartments;
 
-    @Column(name = "allowed_study_years")
+    @Column(name = "allowed_study_years", columnDefinition = "TEXT")
     private String allowedStudyYears;
 }

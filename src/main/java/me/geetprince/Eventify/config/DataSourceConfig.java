@@ -29,6 +29,21 @@ public class DataSourceConfig {
     @Value("${spring.datasource.driver-class-name:org.postgresql.Driver}")
     private String driverClassName;
 
+    @Value("${spring.datasource.hikari.maximum-pool-size:5}")
+    private int maximumPoolSize;
+
+    @Value("${spring.datasource.hikari.minimum-idle:1}")
+    private int minimumIdle;
+
+    @Value("${spring.datasource.hikari.connection-timeout:30000}")
+    private long connectionTimeout;
+
+    @Value("${spring.datasource.hikari.idle-timeout:600000}")
+    private long idleTimeout;
+
+    @Value("${spring.datasource.hikari.max-lifetime:1800000}")
+    private long maxLifetime;
+
     @Bean
     @Primary
     public DataSource dataSource() {
@@ -77,11 +92,11 @@ public class DataSourceConfig {
             hikariConfig.setDriverClassName(driverClassName);
         }
 
-        hikariConfig.setMaximumPoolSize(5);
-        hikariConfig.setMinimumIdle(1);
-        hikariConfig.setConnectionTimeout(30000);
-        hikariConfig.setIdleTimeout(600000);
-        hikariConfig.setMaxLifetime(1800000);
+        hikariConfig.setMaximumPoolSize(maximumPoolSize);
+        hikariConfig.setMinimumIdle(minimumIdle);
+        hikariConfig.setConnectionTimeout(connectionTimeout);
+        hikariConfig.setIdleTimeout(idleTimeout);
+        hikariConfig.setMaxLifetime(maxLifetime);
 
         return new HikariDataSource(hikariConfig);
     }

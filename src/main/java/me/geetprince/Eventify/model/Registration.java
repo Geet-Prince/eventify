@@ -42,9 +42,5 @@ public class Registration {
     @CreationTimestamp
     @Column(name = "registered_at", updatable = false, columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private OffsetDateTime registeredAt;
-    @Column(name = "allowed_departments")
-    private String allowedDepartments;
-    @Column(name = "allowed_study_years")
-    private String allowedStudyYears;
 
 }

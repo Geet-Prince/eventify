@@ -1,12 +1,9 @@
 package me.geetprince.Eventify.controller;
 
-import jakarta.validation.Valid;
-import me.geetprince.Eventify.dto.ClubRequestDTO;
 import me.geetprince.Eventify.dto.ClubResponseDTO;
 import me.geetprince.Eventify.model.Club;
 import me.geetprince.Eventify.service.ClubService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -38,15 +35,5 @@ public class ClubController {
                 .map(ClubResponseDTO::fromEntity)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(clubs);
-    }
-    @PostMapping("/register")
-    public ResponseEntity<?> registerClub(@Valid @RequestBody ClubRequestDTO requestDTO) {
-        Club club = new Club();
-        club.setName(requestDTO.getName());
-        club.setEmail(requestDTO.getEmail());
-        club.setPasswordHash(requestDTO.getPassword());
-        Club registeredClub = clubService.registerClub(club);
-        ClubResponseDTO responseDTO = ClubResponseDTO.fromEntity(registeredClub);
-        return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
     }
 }

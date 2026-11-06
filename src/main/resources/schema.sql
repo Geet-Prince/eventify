@@ -23,9 +23,9 @@ CREATE TABLE IF NOT EXISTS events (
     is_published BOOLEAN NOT NULL DEFAULT FALSE,
     venue VARCHAR(300) NOT NULL,
     guests TEXT,
-    image_link VARCHAR(255),
-    allowed_departments VARCHAR(255),
-    allowed_study_years VARCHAR(255),
+    image_link TEXT,
+    allowed_departments TEXT,
+    allowed_study_years TEXT,
     created_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT fk_events_club FOREIGN KEY (club_id) REFERENCES clubs (id) ON DELETE CASCADE
 );
@@ -40,8 +40,6 @@ CREATE TABLE IF NOT EXISTS registrations (
     study_year INTEGER CHECK (study_year >= 1 AND study_year <= 5),
     is_checked_in BOOLEAN NOT NULL DEFAULT FALSE,
     registered_at TIMESTAMP WITH TIME ZONE,
-    allowed_departments VARCHAR(255),
-    allowed_study_years VARCHAR(255),
     CONSTRAINT fk_registrations_event FOREIGN KEY (event_id) REFERENCES events (id) ON DELETE CASCADE,
     CONSTRAINT uk_registrations_event_attendee_email UNIQUE (event_id, attendee_email)
 );
