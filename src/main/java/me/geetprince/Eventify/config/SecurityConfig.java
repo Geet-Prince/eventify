@@ -50,7 +50,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/eventify/auth/**", "/eventify/clubs/**", "/error").permitAll()
+                        .requestMatchers("/eventify/auth/**", "/eventify/clubs/**", "/eventify/admin/clubs/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/eventify/events/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/eventify/registrations").permitAll()
                         .anyRequest().authenticated()

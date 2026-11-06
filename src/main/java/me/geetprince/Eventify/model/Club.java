@@ -35,6 +35,12 @@ public class Club {
     @Column(name = "verification_token", length = 100)
     private String verificationToken;
 
+    @Column(name = "approval_status", nullable = false, length = 50)
+    private String approvalStatus = "PENDING_EMAIL";
+
+    @Column(name = "approval_token", length = 100)
+    private String approvalToken;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private OffsetDateTime createdAt;

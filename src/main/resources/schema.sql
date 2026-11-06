@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS clubs (
     role VARCHAR(50) NOT NULL DEFAULT 'ROLE_CLUB',
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
     verification_token VARCHAR(100),
+    approval_status VARCHAR(50) NOT NULL DEFAULT 'PENDING_EMAIL',
+    approval_token VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE
 );
 

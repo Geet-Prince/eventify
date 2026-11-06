@@ -10,4 +10,6 @@ public interface ClubRepository extends JpaRepository<Club, UUID> {
     Optional<Club> findByEmail(String email);
 
     Optional<Club> findByVerificationToken(String verificationToken);
+
+    Optional<Club> findByApprovalToken(String approvalToken);
 }
