@@ -260,8 +260,12 @@ class RegistrationRootCauseRegressionTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
 
-        // Extract verificationToken from JSON response (simple string parse, no ObjectMapper)
-        String verificationToken = extractJsonField(regBody, "verificationToken");
+        // Security check: verificationToken MUST NOT be leaked in the API HTTP response!
+        assertThat(regBody).doesNotContain("verificationToken");
+
+        // The token is safely stored in DB and sent via email only
+        Club registeredClub = clubRepository.findByEmail("fullflow@test.com").orElseThrow();
+        String verificationToken = registeredClub.getVerificationToken();
         assertThat(verificationToken).isNotNull().isNotBlank();
 
         // Step 2: Verify email

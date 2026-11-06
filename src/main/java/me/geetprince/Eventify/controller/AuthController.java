@@ -54,10 +54,7 @@ public class AuthController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("club", responseDTO);
-        response.put("message", "Registration successful. Please verify your email using the verification token sent to your email.");
-        if (registeredClub.getVerificationToken() != null) {
-            response.put("verificationToken", registeredClub.getVerificationToken());
-        }
+        response.put("message", "Registration successful. Please verify your email using the link sent to your inbox.");
 
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
