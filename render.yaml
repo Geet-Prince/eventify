@@ -50,7 +50,9 @@ services:
       - key: JWT_SECRET
         generateValue: true             # Render generates a secure random value
 
-      # ── SMTP (Brevo) – set these in Render dashboard ───────────────────────
+      # ── Email (Brevo HTTPS REST API on Port 443 + SMTP Fallback) ──
+      - key: BREVO_API_KEY
+        sync: false                     # Generated in Brevo -> SMTP & API -> API Keys
       - key: SPRING_MAIL_HOST
         value: smtp-relay.brevo.com
       - key: SPRING_MAIL_PORT

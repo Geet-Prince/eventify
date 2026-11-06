@@ -1,6 +1,5 @@
 package me.geetprince.Eventify.service;
 
-import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import me.geetprince.Eventify.model.Club;
 import org.slf4j.Logger;
@@ -12,12 +11,21 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+
 @Service
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     private final JavaMailSender mailSender;
+
+    @Value("${brevo.api-key:${BREVO_API_KEY:}}")
+    private String brevoApiKey;
 
     @Value("${app.admin.email:}")
     private String adminEmail;
@@ -116,6 +124,18 @@ public class EmailService {
     }
 
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
+        // Strategy 1: Brevo HTTPS REST API (Port 443) – Recommended for Render Free tier
+        // Render blocks outbound SMTP ports 25, 465, and 587. HTTPS Port 443 is always open.
+        if (brevoApiKey != null && !brevoApiKey.isBlank()) {
+            try {
+                sendViaBrevoApi(to, subject, htmlBody);
+                return;
+            } catch (Exception e) {
+                log.error("Failed to send email via Brevo REST API, attempting SMTP fallback: {}", e.getMessage(), e);
+            }
+        }
+
+        // Strategy 2: JavaMail SMTP (Port 587/2525) – Used locally with MailHog or on paid tiers
         if (mailSender == null) {
             log.warn("JavaMailSender is not configured. Email will be logged only.\nTo: {}\nSubject: {}\nBody: {}", to, subject, htmlBody);
             return;
@@ -129,10 +149,48 @@ public class EmailService {
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
             mailSender.send(message);
-            log.info("Email successfully dispatched to {}", to);
+            log.info("Email successfully dispatched via SMTP to {}", to);
         } catch (Exception e) {
-            log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
+            log.error("Failed to send email via SMTP to {}: {}", to, e.getMessage(), e);
         }
+    }
+
+    private void sendViaBrevoApi(String to, String subject, String htmlBody) throws Exception {
+        String payload = "{\"sender\":{\"name\":\"Eventify\",\"email\":\"" + escapeJson(senderEmail) + "\"},"
+                + "\"to\":[{\"email\":\"" + escapeJson(to) + "\"}],"
+                + "\"subject\":\"" + escapeJson(subject) + "\","
+                + "\"htmlContent\":\"" + escapeJson(htmlBody) + "\"}";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
+                .header("api-key", brevoApiKey.trim())
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload))
+                .timeout(Duration.ofSeconds(10))
+                .build();
+
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            log.info("Email successfully dispatched via Brevo HTTPS API (Port 443) to {}", to);
+        } else {
+            throw new RuntimeException("Brevo API error HTTP " + response.statusCode() + ": " + response.body());
+        }
+    }
+
+    private String escapeJson(String text) {
+        if (text == null) return "";
+        return text.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     private String escapeHtml(String text) {

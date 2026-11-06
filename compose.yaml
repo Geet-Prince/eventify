@@ -46,7 +46,8 @@ services:
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
       JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-604800000}
 
-      # ── Email (Brevo SMTP) ────────────────────────────────────
+      # ── Email (Brevo HTTPS REST API on Port 443 + SMTP Fallback) ──
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp-relay.brevo.com}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
