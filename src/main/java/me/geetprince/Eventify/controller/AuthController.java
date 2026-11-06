@@ -28,6 +28,9 @@ public class AuthController {
     private final LoginRateLimiterService rateLimiterService;
     private final RefreshTokenService refreshTokenService;
 
+    @org.springframework.beans.factory.annotation.Value("${app.frontend-url:https://eventify.geetprince.me}")
+    private String frontendUrl;
+
     @Autowired
     public AuthController(
             ClubService clubService,
@@ -60,13 +63,33 @@ public class AuthController {
     }
 
     @GetMapping("/verify")
-    public ResponseEntity<?> verifyEmail(@RequestParam String token) {
+    public ResponseEntity<?> verifyEmail(
+            @RequestParam String token,
+            @RequestHeader(value = "Accept", required = false) String acceptHeader) {
+        boolean acceptsHtml = acceptHeader != null && acceptHeader.contains("text/html");
         try {
             Club verifiedClub = clubService.verifyClubEmail(token);
+            if (acceptsHtml) {
+                String html = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 25px; border-radius: 8px; border: 1px solid #e0e0e0; text-align: center;'>"
+                        + "<h2 style='color: #4F46E5;'>Email Verified Successfully!</h2>"
+                        + "<p>Email for <b>" + verifiedClub.getName() + "</b> (" + verifiedClub.getEmail() + ") has been verified.</p>"
+                        + "<p>Your club registration request has been submitted for Institutional Admin approval. You will receive an email once approved.</p>"
+                        + "<a href='" + frontendUrl + "' style='background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; margin-top: 15px;'>Return to Eventify</a>"
+                        + "</div>";
+                return ResponseEntity.ok().contentType(org.springframework.http.MediaType.TEXT_HTML).body(html);
+            }
             Map<String, String> response = new HashMap<>();
-            response.put("message", "Email verified successfully for: " + verifiedClub.getEmail() + ". You can now log in.");
+            response.put("message", "Email verified successfully for: " + verifiedClub.getEmail() + ". Your application is now pending institutional approval.");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
+            if (acceptsHtml) {
+                String errorHtml = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 25px; border-radius: 8px; border: 1px solid #fecaca; text-align: center;'>"
+                        + "<h2 style='color: #DC2626;'>Verification Failed</h2>"
+                        + "<p>" + e.getMessage() + "</p>"
+                        + "<a href='" + frontendUrl + "' style='color: #4F46E5; text-decoration: underline;'>Return to Eventify</a>"
+                        + "</div>";
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(org.springframework.http.MediaType.TEXT_HTML).body(errorHtml);
+            }
             ErrorResponse error = new ErrorResponse(
                     HttpStatus.BAD_REQUEST.value(),
                     "Verification Failed",

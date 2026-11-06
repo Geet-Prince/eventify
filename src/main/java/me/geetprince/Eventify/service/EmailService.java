@@ -25,14 +25,18 @@ public class EmailService {
     @Value("${app.mail.sender-email:noreply@eventify.com}")
     private String senderEmail;
 
-    @Value("${app.base-url:http://localhost:8080}")
+    @Value("${app.base-url:https://eventify-backend-bcb0.onrender.com}")
     private String baseUrl;
+
+    @Value("${app.frontend-url:https://eventify.geetprince.me}")
+    private String frontendUrl;
 
     @Autowired(required = false)
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
 
+    @Async
     public void sendVerificationEmail(String recipientEmail, String clubName, String verificationToken) {
         String verificationUrl = baseUrl + "/eventify/auth/verify?token=" + verificationToken;
         String subject = "Verify your email for Eventify Club Registration";
@@ -51,6 +55,7 @@ public class EmailService {
         sendHtmlEmail(recipientEmail, subject, content);
     }
 
+    @Async
     public void sendAdminApprovalRequest(Club club) {
         if (adminEmail == null || adminEmail.isBlank()) {
             log.warn("ADMIN_EMAIL is not configured. Admin approval notification cannot be sent for club: {}", club.getName());
@@ -80,8 +85,9 @@ public class EmailService {
         sendHtmlEmail(adminEmail, subject, content);
     }
 
+    @Async
     public void sendClubApprovalNotification(String recipientEmail, String clubName) {
-        String loginUrl = baseUrl + "/eventify/auth/login";
+        String loginUrl = frontendUrl + "/login";
         String subject = "Congratulations! Your Club Has Been Approved - Eventify";
         String content = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>"
                 + "<h2 style='color: #16A34A;'>Your Club is Approved!</h2>"
@@ -96,6 +102,7 @@ public class EmailService {
         sendHtmlEmail(recipientEmail, subject, content);
     }
 
+    @Async
     public void sendClubRejectionNotification(String recipientEmail, String clubName) {
         String subject = "Update regarding your Eventify Club Registration Request";
         String content = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>"
@@ -123,7 +130,7 @@ public class EmailService {
             helper.setText(htmlBody, true);
             mailSender.send(message);
             log.info("Email successfully dispatched to {}", to);
-        } catch (MessagingException e) {
+        } catch (Exception e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
         }
     }
