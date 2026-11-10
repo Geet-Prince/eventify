@@ -517,10 +517,23 @@ Base URL: `http://localhost:8080`
 ```
 * **Success Response**: `201 Created` with saved Event object.
 
-#### Get All Events
+#### Get All Events (Public Feed)
 * **Method & URL**: `GET /eventify/events`
 * **Access**: 🌐 Public
-* **Success Response**: `200 OK` with list of events.
+* **Description**: Returns all published events (`isPublic: true`).
+* **Success Response**: `200 OK` with list of `EventResponseDTO`.
+
+#### Get My Club's Events (Dashboard: Drafts & Published)
+* **Method & URL**: `GET /eventify/events/my-events`
+* **Access**: 🔒 **Protected** (Requires `Authorization: Bearer <jwt_token>`)
+* **Description**: Returns all events belonging to the authenticated club, including drafts (`isPublic: false`) and published events.
+* **Success Response**: `200 OK` with list of `EventResponseDTO`.
+
+#### Publish / Unpublish Event (Toggle)
+* **Method & URL**: `PATCH /eventify/events/{id}/publish?isPublic=true`
+* **Access**: 🔒 **Protected** (Requires `Authorization: Bearer <jwt_token>`)
+* **Description**: One-click toggle allowing a club to publish a draft or unpublish an event.
+* **Success Response**: `200 OK` with updated `EventResponseDTO`.
 
 #### Get Event by ID
 * **Method & URL**: `GET /eventify/events/{id}`
@@ -531,6 +544,11 @@ Base URL: `http://localhost:8080`
 * **Method & URL**: `PUT /eventify/events/{id}`
 * **Access**: 🔒 **Protected** (Requires `Authorization: Bearer <jwt_token>`)
 * **Success Response**: `200 OK` with updated Event.
+
+#### Delete Event
+* **Method & URL**: `DELETE /eventify/events/{id}`
+* **Access**: 🔒 **Protected** (Requires `Authorization: Bearer <jwt_token>`)
+* **Success Response**: `204 No Content`.
 
 ---
 
