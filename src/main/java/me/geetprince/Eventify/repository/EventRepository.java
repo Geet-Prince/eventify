@@ -21,5 +21,8 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
 
     @EntityGraph(attributePaths = {"club"})
     List<Event> findByClub_NameContainingIgnoreCase(String clubName);
+
+    @EntityGraph(attributePaths = {"club"})
+    List<Event> findByClub_Id(UUID clubId);
 }
 

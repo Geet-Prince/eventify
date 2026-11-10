@@ -45,6 +45,22 @@ public class EventService {
         return eventRepo.findByClub_NameContainingIgnoreCase(clubName);
     }
 
+    public List<Event> getEventsByClubId(UUID clubId) {
+        return eventRepo.findByClub_Id(clubId);
+    }
+
+    public Event togglePublishEvent(UUID id, boolean isPublic, String authenticatedEmail) {
+        Event existingEvent = eventRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("This event not found"));
+
+        if (!existingEvent.getClub().getEmail().equalsIgnoreCase(authenticatedEmail)) {
+            throw new AccessDeniedException("You are not authorized to update this event.");
+        }
+
+        existingEvent.setPublic(isPublic);
+        return eventRepo.save(existingEvent);
+    }
+
     public Event updateEvent(UUID id, Event updatedEventDetails, String authenticatedEmail) {
         Event existingEvent = eventRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("This event not found"));

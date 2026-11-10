@@ -85,6 +85,7 @@ open http://localhost:8025
 | `JWT_SECRET` | `local-dev-jwt-secret-…` | Must be ≥ 32 chars |
 | `ADMIN_EMAIL` | `admin@localhost` | Approval emails go here (visible in MailHog) |
 | `SENDER_EMAIL` | `noreply@localhost` | From: address |
+| `BREVO_API_KEY` | _(empty)_ | Optional locally — MailHog needs no auth; only set to test real Brevo delivery |
 
 > ⚠️ `.env.local` and `.env` are in `.gitignore` — never commit real secrets.
 

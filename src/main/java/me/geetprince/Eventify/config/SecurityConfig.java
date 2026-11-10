@@ -51,6 +51,8 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/eventify/auth/**", "/eventify/clubs/**", "/eventify/admin/clubs/**", "/error").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/eventify/events/my-events").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/eventify/events/*/publish").authenticated()
                         .requestMatchers(HttpMethod.GET, "/eventify/events/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/eventify/registrations").permitAll()
                         .anyRequest().authenticated()

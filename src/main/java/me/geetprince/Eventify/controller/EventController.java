@@ -46,6 +46,30 @@ public class EventController {
         return ResponseEntity.ok(dtos);
     }
 
+    @GetMapping("/my-events")
+    public ResponseEntity<List<EventResponseDTO>> getMyEvents(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Club authenticatedClub = clubService.getClubByEmail(principal.getName());
+        List<EventResponseDTO> dtos = eventService.getEventsByClubId(authenticatedClub.getId()).stream()
+                .map(EventResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
+    @RequestMapping(value = "/{id}/publish", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
+    public ResponseEntity<EventResponseDTO> togglePublishEvent(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "true") boolean isPublic,
+            Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Event updated = eventService.togglePublishEvent(id, isPublic, principal.getName());
+        return ResponseEntity.ok(EventResponseDTO.fromEntity(updated));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<EventResponseDTO> getEventById(@PathVariable UUID id, Principal principal) {
         try {
